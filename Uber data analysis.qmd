@@ -1,0 +1,232 @@
+---
+title: "Uber analysis"
+author: "Eva Wanjiru"
+format: html
+editor: visual
+---
+
+## Uber Data Analysis through visualizations in R
+
+Data storytelling is a crucial part of machine learning that allows businesses to comprehend the history of diverse processes. Companies can benefit from understanding complex data and gaining insights that will help them make decisions by using visualization. This project is more of a data visualization tutorial that shows you how to use the ggplot2 library to comprehend the data and cultivate an intuitive understanding of the travelers.
+
+```{r}
+##load packages
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+library(DT)
+library(scales)
+```
+
+```{r}
+##load the data
+apr_data <- read.csv("uber-raw-data-apr14.csv")
+may_data <- read.csv("uber-raw-data-may14.csv")
+jun_data <- read.csv("uber-raw-data-jun14.csv")
+jul_data <- read.csv("uber-raw-data-jul14.csv")
+aug_data <- read.csv("uber-raw-data-aug14.csv")
+sep_data <- read.csv("uber-raw-data-sep14.csv")
+```
+
+```{r}
+# Combine the data together 
+data <- rbind(apr_data, may_data, jun_data, jul_data, aug_data, sep_data)
+cat("The dimensions of the data are:", dim(data))
+```
+
+The dataset has 4534327 observations and 4 rows.
+
+```{r}
+##first 6 rows
+head(data)
+```
+
+```{r}
+##structure of the data
+str(data)
+```
+
+## Data cleaning
+
+The datetime is formatted into a more readable format.
+
+```{r}
+##recode the variables into the right format (date column)
+data$Date.Time <- as.POSIXct(data$Date.Time, format="%m/%d/%Y %H:%M:%S")
+data$Time <- format(as.POSIXct(data$Date.Time, format = "%m/%d/%Y %H:%M:%S"), format="%H:%M:%S")
+data$Date.Time <- ymd_hms(data$Date.Time)
+```
+
+```{r}
+# Create individual columns for month day and year
+data$day <- factor(day(data$Date.Time))
+data$month <- factor(month(data$Date.Time, label=TRUE))
+data$year <- factor(year(data$Date.Time))
+data$dayofweek <- factor(wday(data$Date.Time, label=TRUE))
+```
+
+```{r}
+# Add Time variables as well 
+data$second = factor(second(hms(data$Time)))
+data$minute = factor(minute(hms(data$Time)))
+data$hour = factor(hour(hms(data$Time)))
+
+##copy the data
+df<-data
+```
+
+## Data visualization
+
+```{r}
+hourly_data <- df %>% 
+                    group_by(hour) %>% 
+                            dplyr::summarize(Total = n())
+
+# Shows data in a searchable js table
+datatable(hourly_data)
+```
+
+```{r}
+##plot the data by hour
+hourly_data %>% 
+  ggplot(aes(x=hour,y=Total))+
+geom_bar(stat="identity", 
+         fill="steelblue", 
+         color="coral") + 
+ggtitle("Trips Every Hour", subtitle = "aggregated today") + 
+theme(legend.position = "none", 
+      plot.title = element_text(hjust = 0.5), 
+      plot.subtitle = element_text(hjust = 0.5)) + 
+scale_y_continuous(labels=comma)
+```
+
+From the graph above, it an be seen that most trips are made between 1700hrs and 1800hrs.
+
+```{r}
+# Aggregate the data by month and hour
+month_hour_data <- df %>% group_by(month, hour) %>%  dplyr::summarize(Total = n())
+
+ggplot(month_hour_data, aes(hour, Total, fill=month)) + 
+geom_bar(stat = "identity") + 
+ggtitle("Trips by Hour and Month") + 
+scale_y_continuous(labels = comma)
+
+```
+
+#### Plotting trips during every day of the month
+
+```{r}
+# Aggregate data by day of the month 
+day_data <- df %>% group_by(day) %>% dplyr::summarize(Trips = n())
+day_data
+
+# Plot the data for the day
+ggplot(day_data, aes(day, Trips)) + 
+geom_bar(stat = "identity", fill = "steelblue") +
+ggtitle("Trips by day of the month") + 
+theme(legend.position = "none") + 
+scale_y_continuous(labels = comma)
+```
+
+Most trips are recorded on the 30th day of the month.
+
+```{r}
+##select the color vector
+colors = c("#CC1011", "#665555", "#05a399", "#cfcaca", "#f5e840", "#0683c9", "#e075b0")
+```
+
+```{r}
+# Collect data by day of the week and month
+day_month_data <- df %>% group_by(dayofweek, month) %>% dplyr::summarize(Trips = n())
+day_month_data
+
+# Plot 
+ggplot(day_month_data, aes(dayofweek, Trips, fill = month)) + 
+geom_bar(stat = "identity", aes(fill = month), position = "dodge") + 
+ggtitle("Trips by Day and Month") + 
+scale_y_continuous(labels = comma) + 
+scale_fill_manual(values = colors)
+```
+
+#### Number of trips during months in a year
+
+```{r}
+month_data <- df %>% group_by(month) %>% dplyr::summarize(Total = n())
+
+month_data
+
+ggplot(month_data, aes(month, Total, fill = month)) + 
+geom_bar(stat = "Identity") + 
+ggtitle("Trips in a month") + 
+theme(legend.position = "none") + 
+scale_y_continuous(labels = comma) + 
+scale_fill_manual(values = colors)
+```
+
+Most trips are made in September.
+
+### Heat map visualizations
+
+#### Heatmap by hour and day
+
+```{r}
+day_hour_data <- df %>% group_by(day, hour) %>% dplyr::summarize(Total = n())
+datatable(day_hour_data)
+
+# Plot a heatmap 
+
+ggplot(day_hour_data, aes(day, hour, fill = Total)) + 
+geom_tile(color = "white") + 
+ggtitle("Heat Map by Hour and Day")
+```
+
+#### Heatmap by day and month
+
+```{r}
+# Collect data by month and day
+month_day_data <- df %>% group_by(month, day) %>% dplyr::summarize(Trips = n())
+month_day_data
+
+# Plot a heatmap 
+
+ggplot(month_day_data, aes(day, month, fill = Trips)) + 
+geom_tile(color = "white") + 
+ggtitle("Heat Map by Month and Day")
+
+##plot an interactive heat map
+#df <- normalize(month_day_data)
+#heatmaply(month_day_data)
+```
+
+#### Heatmap by day of the week and month
+
+```{r}
+# Plot a heatmap by day of the week and month
+
+ggplot(day_month_data, aes(dayofweek, month, fill = Trips)) + 
+geom_tile(color = "white") + 
+ggtitle("Heat Map by Month and Day")
+```
+
+## Map visualizations
+
+```{r}
+# Set Map Constants
+min_lat <- 40 
+max_lat <- 40.91
+min_long <- -74.15
+max_long <- -73.7004
+```
+
+```{r}
+ggplot(df, aes(x=Lon, y=Lat)) +
+  geom_point(size=1, color = "coral") +
+     scale_x_continuous(limits=c(min_long, max_long)) +
+      scale_y_continuous(limits=c(min_lat, max_lat)) +
+        theme_map() +
+           ggtitle("NYC MAP BASED ON UBER RIDES DURING 2014 (APR-SEP)")
+```
+
+```{}
+```
